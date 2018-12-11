@@ -27,6 +27,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <time.h>
 
@@ -40,28 +41,31 @@ static void print_help(void)
 	       "Usage: mini_snmpd [options]\n"
 	       "\n"
 #ifdef CONFIG_ENABLE_IPV6
-	       "  -4, --use-ipv4         Use IPv4, default\n"
-	       "  -6, --use-ipv6         Use IPv6\n"
+	       "  -4, --use-ipv4                  Use IPv4, default\n"
+	       "  -6, --use-ipv6                  Use IPv6\n"
 #endif
 #ifdef HAVE_LIBCONFUSE
-	       "  -f, --file=FILE        Configuration file. Default: " CONFDIR "/%s.conf\n"
+	       "  -f, --file=FILE                 Configuration file. Default: " CONFDIR "/%s.conf\n"
 #endif
-	       "  -p, --udp-port PORT    UDP port to bind to, default: 161\n"
-	       "  -P, --tcp-port PORT    TCP port to bind to, default: 161\n"
-	       "  -c, --community STR    Community string, default: public\n"
-	       "  -D, --description STR  System description, default: none\n"
-	       "  -V, --vendor OID       System vendor, default: none\n"
-	       "  -L, --location STR     System location, default: none\n"
-	       "  -C, --contact STR      System contact, default: none\n"
-	       "  -d, --disks PATH       Disks to monitor, default: /\n"
-	       "  -i, --interfaces IFACE Network interfaces to monitor, default: none\n"
-	       "  -I, --listen IFACE     Network interface to listen, default: all\n"
-	       "  -t, --timeout SEC      Timeout for MIB updates, default: 1 second\n"
-	       "  -a, --auth             Enable authentication, i.e. SNMP version 2c\n"
-	       "  -n, --foreground       Run in foreground, do not detach from controlling terminal\n"
-	       "  -s, --syslog           Use syslog for logging, even if running in the foreground\n"
-	       "  -v, --verbose          Verbose messages\n"
-	       "  -h, --help             This help text\n"
+	       "  -p, --udp-port PORT             UDP port to bind to, default: 161\n"
+	       "  -P, --tcp-port PORT             TCP port to bind to, default: 161\n"
+	       "  -c, --community STR             Community string, default: public\n"
+	       "  -D, --description STR           System description, default: none\n"
+	       "  -V, --vendor OID                System vendor, default: none\n"
+	       "  -L, --location STR              System location, default: none\n"
+	       "  -C, --contact STR               System contact, default: none\n"
+	       "  -d, --disks PATH                Disks to monitor, default: /\n"
+	       "  -i, --interfaces IFACE          Network interfaces to monitor, default: none\n"
+#ifdef __linux__
+	       "  -w, --wireless-interfaces IFACE Wireless network interfaces to monitor, default: none\n"
+#endif
+	       "  -I, --listen IFACE              Network interface to listen, default: all\n"
+	       "  -t, --timeout SEC               Timeout for MIB updates, default: 1 second\n"
+	       "  -a, --auth                      Enable authentication, i.e. SNMP version 2c\n"
+	       "  -n, --foreground                Run in foreground, do not detach from controlling terminal\n"
+	       "  -s, --syslog                    Use syslog for logging, even if running in the foreground\n"
+	       "  -v, --verbose                   Verbose messages\n"
+	       "  -h, --help                      This help text\n"
 	       "\n"
 #ifdef HAVE_LIBCONFUSE
 	       , PACKAGE_NAME
@@ -286,7 +290,7 @@ static void handle_tcp_client_read(client_t *client)
 
 int main(int argc, char *argv[])
 {
-	static const char short_options[] = "p:P:c:D:V:L:C:d:i:t:ansvh"
+	static const char short_options[] = "p:P:c:D:V:L:C:d:i:w:t:ansvh"
 #ifndef __FreeBSD__
 		"I:"
 #endif
@@ -314,6 +318,9 @@ int main(int argc, char *argv[])
 		{ "contact", 1, 0, 'C' },
 		{ "disks", 1, 0, 'd' },
 		{ "interfaces", 1, 0, 'i' },
+#ifdef __linux__
+		{ "wireless-interfaces", 1, 0, 'w' },
+#endif
 #ifndef __FreeBSD__
 		{ "listen", 1, 0, 'I' },
 #endif
@@ -413,7 +420,11 @@ int main(int argc, char *argv[])
 			case 'i':
 				g_interface_list_length = split(optarg, ",;", g_interface_list, MAX_NR_INTERFACES);
 				break;
-
+#ifdef __linux__
+			case 'w':
+				g_wireless_list_length = split(optarg, ",;", g_wireless_list, MAX_NR_INTERFACES);
+				break;
+#endif
 			case 't':
 				g_timeout = atoi(optarg) * 100;
 				break;

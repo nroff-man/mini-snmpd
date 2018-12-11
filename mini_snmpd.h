@@ -238,6 +238,13 @@ typedef struct netinfo_s {
 	char mac_addr[MAX_NR_INTERFACES][6];
 } netinfo_t;
 
+#ifdef __linux__
+typedef struct wirelessinfo_s {
+	unsigned int signal[MAX_NR_INTERFACES];
+	unsigned int noise[MAX_NR_INTERFACES];
+} wirelessinfo_t;
+#endif
+
 #ifdef CONFIG_ENABLE_DEMO
 typedef struct demoinfo_s {
 	unsigned int random_value_1;
@@ -274,6 +281,11 @@ extern size_t    g_disk_list_length;
 
 extern char     *g_interface_list[MAX_NR_INTERFACES];
 extern size_t    g_interface_list_length;
+
+#ifdef __linux__
+extern char     *g_wireless_list[MAX_NR_INTERFACES];
+extern size_t    g_wireless_list_length;
+#endif
 
 extern in_port_t g_udp_port;
 extern in_port_t g_tcp_port;
@@ -325,6 +337,9 @@ void         get_meminfo        (meminfo_t *meminfo);
 void         get_cpuinfo        (cpuinfo_t *cpuinfo);
 void         get_diskinfo       (diskinfo_t *diskinfo);
 void         get_netinfo        (netinfo_t *netinfo);
+#ifdef __linux__
+void         get_wirelessinfo   (wirelessinfo_t *wirelessinfo);
+#endif
 #ifdef CONFIG_ENABLE_DEMO
 void         get_demoinfo       (demoinfo_t *demoinfo);
 #endif

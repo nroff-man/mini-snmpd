@@ -1,6 +1,7 @@
 /* Linux backend
  *
  * Copyright (C) 2008-2010  Robert Ernst <robert.ernst@linux-solutions.at>
+ * Copyright (C) 2018       Darron Broad <darron@kewl.org>
  *
  * This file may be distributed and/or modified under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -32,6 +33,11 @@
 #include <ctype.h>
 #include <time.h>
 #include <math.h>
+
+#ifndef __USE_MISC
+#define __USE_MISC
+#endif
+#include <linux/wireless.h>
 
 #include "mini_snmpd.h"
 
@@ -176,6 +182,82 @@ void get_netinfo(netinfo_t *netinfo)
 
 	if (parse_file("/proc/net/dev", fields))
 		memset(netinfo, 0, sizeof(*netinfo));
+}
+
+static inline int get_wireless_sn(char *ifname, int *signal, int *noise)
+{
+	int fd, rc;
+	struct iwreq iwrq;
+	struct iw_statistics iw_s;
+	struct iw_range iw_r;
+
+	*signal = *noise = 0;
+
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd < 0)
+		goto error2;
+
+	bzero(&iwrq, sizeof(struct iwreq));
+	strncpy(iwrq.ifr_name, ifname, IFNAMSIZ);
+
+	bzero(&iw_s, sizeof(struct iw_statistics));
+	iwrq.u.data.pointer = &iw_s;
+	iwrq.u.data.length = sizeof(struct iw_statistics);
+
+	rc = ioctl(fd, SIOCGIWSTATS, &iwrq);
+	if (rc < 0)
+		goto error1;
+
+	if (iw_s.qual.updated & IW_QUAL_RCPI) {
+		if (!(iw_s.qual.updated & IW_QUAL_LEVEL_INVALID))
+			*signal = (iw_s.qual.level / 2) - 110;
+
+		if (!(iw_s.qual.updated & IW_QUAL_NOISE_INVALID))
+			*noise = (iw_s.qual.noise / 2) - 110;
+	}
+	else if (iw_s.qual.updated & IW_QUAL_DBM) {
+		if (!(iw_s.qual.updated & IW_QUAL_LEVEL_INVALID))
+			*signal = iw_s.qual.level - 256;
+
+		if (!(iw_s.qual.updated & IW_QUAL_NOISE_INVALID))
+			*noise = iw_s.qual.noise - 256;
+	}
+	else {
+		bzero(&iw_r, sizeof(struct iw_range));
+		iwrq.u.data.pointer = &iw_r;
+		iwrq.u.data.length = sizeof(struct iw_range);
+
+		rc = ioctl(fd, SIOCGIWRANGE, &iwrq);
+		if (rc < 0)
+			goto error1;
+
+		if (!(iw_s.qual.updated & IW_QUAL_LEVEL_INVALID) && iw_r.max_qual.level) 
+			*signal = (100 * iw_s.qual.level) / iw_r.max_qual.level;
+
+		if (!(iw_s.qual.updated & IW_QUAL_NOISE_INVALID) && iw_r.max_qual.noise)
+			*noise = (100 * iw_s.qual.noise) / iw_r.max_qual.noise;
+	}
+
+	close(fd);
+	return 0;
+
+error1:
+	close(fd);
+error2:
+	return -1;
+}
+
+void get_wirelessinfo(wirelessinfo_t *wirelessinfo)
+{
+	size_t i;
+	int signal, noise;
+
+	for (i = 0; i < g_wireless_list_length; i++) {
+		get_wireless_sn(g_wireless_list[i], &signal, &noise);
+
+		wirelessinfo->signal[i] = signal;
+		wirelessinfo->noise[i] = noise;
+	}
 }
 
 #endif /* __linux__ */

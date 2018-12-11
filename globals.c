@@ -44,6 +44,11 @@ size_t    g_disk_list_length        = 1;
 char     *g_interface_list[MAX_NR_INTERFACES];
 size_t    g_interface_list_length = 0;
 
+#ifdef __linux__
+char     *g_wireless_list[MAX_NR_INTERFACES];
+size_t    g_wireless_list_length = 0;
+#endif
+
 in_port_t g_udp_port = 161;
 in_port_t g_tcp_port = 161;
 

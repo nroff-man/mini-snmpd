@@ -44,6 +44,9 @@ static const oid_t m_system_oid         = { { 1, 3, 6, 1, 2, 1, 1               
 static const oid_t m_if_1_oid           = { { 1, 3, 6, 1, 2, 1, 2               }, 7, 8  };
 static const oid_t m_if_2_oid           = { { 1, 3, 6, 1, 2, 1, 2, 2, 1         }, 9, 10 };
 static const oid_t m_host_oid           = { { 1, 3, 6, 1, 2, 1, 25, 1           }, 8, 9  };
+#ifdef __linux__
+static const oid_t m_wireless_oid       = { { 1, 3, 6, 1, 4, 1, 762, 2, 5, 2, 1 }, 11,13 };
+#endif
 static const oid_t m_memory_oid         = { { 1, 3, 6, 1, 4, 1, 2021, 4,        }, 8, 10 };
 static const oid_t m_disk_oid           = { { 1, 3, 6, 1, 4, 1, 2021, 9, 1      }, 9, 11 };
 static const oid_t m_load_oid           = { { 1, 3, 6, 1, 4, 1, 2021, 10, 1     }, 9, 11 };
@@ -630,6 +633,22 @@ int mib_build(void)
 	if (!mib_alloc_entry(&m_host_oid, 1, 0, BER_TYPE_TIME_TICKS))
 		return -1;
 
+#ifdef __linux__
+	if (g_wireless_list_length > 0) {
+		for (i = 0; i < g_wireless_list_length; i++) {
+			if (mib_build_entry(&m_wireless_oid, 1, i + 1, BER_TYPE_INTEGER, (const void *)(i + 1)) == -1)
+				return -1;
+		}
+		for (i = 0; i < g_wireless_list_length; i++) {
+			if (mib_build_entry(&m_wireless_oid, 3, i + 1, BER_TYPE_OCTET_STRING, g_wireless_list[i]) == -1)
+				return -1;
+		}
+		if (mib_build_entries(&m_wireless_oid, 7, 1, g_wireless_list_length, BER_TYPE_INTEGER) == -1 ||
+		    mib_build_entries(&m_wireless_oid, 8, 1, g_wireless_list_length, BER_TYPE_INTEGER) == -1)
+			return -1;
+	}
+#endif
+
 	/*
 	 * The memory MIB: total/free memory (UCD-SNMP-MIB.txt)
 	 * Caution: on changes, adapt the corresponding mib_update() section too!
@@ -724,6 +743,9 @@ int mib_update(int full)
 		meminfo_t meminfo;
 		cpuinfo_t cpuinfo;
 		netinfo_t netinfo;
+#ifdef __linux__
+		wirelessinfo_t wirelessinfo;
+#endif
 #ifdef CONFIG_ENABLE_DEMO
 		demoinfo_t demoinfo;
 #endif
@@ -804,6 +826,24 @@ int mib_update(int full)
 	 */
 	if (mib_update_entry(&m_host_oid, 1, 0, &pos, BER_TYPE_TIME_TICKS, (const void *)(uintptr_t)get_system_uptime()) == -1)
 		return -1;
+
+#ifdef __linux__
+	if (full) {
+		if (g_wireless_list_length > 0) {
+			get_wirelessinfo(&u.wirelessinfo);
+
+			for (i = 0; i < g_wireless_list_length; i++) {
+				if (mib_update_entry(&m_wireless_oid, 7, i + 1, &pos, BER_TYPE_INTEGER, (const void *)(uintptr_t)u.wirelessinfo.noise[i]) == -1)
+					return -1;
+			}
+
+			for (i = 0; i < g_wireless_list_length; i++) {
+				if (mib_update_entry(&m_wireless_oid, 8, i + 1, &pos, BER_TYPE_INTEGER, (const void *)(uintptr_t)u.wirelessinfo.signal[i]) == -1)
+					return -1;
+			}
+		}
+	}
+#endif
 
 	/*
 	 * The memory MIB: total/free memory (UCD-SNMP-MIB.txt)
